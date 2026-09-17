@@ -13,16 +13,14 @@ square = pygame.Rect(400, 300, 50, 50)
 # Sideways speed of square
 speed = 5
 
-# --- Gravity setup ---
-# Gravity is just a number we add to the square's vertical speed
-# every frame, so it speeds up the longer it falls (acceleration!).
+# Gravity: a small number we add to fall_speed every frame.
+# The longer the square falls, the faster it goes!
 gravity = 0.5
-velocity_y = 0
-jump_strength = -12
-on_ground = False
+fall_speed = 0
+jump_power = -12
+standing_on_something = False
 
-# --- Platforms the square can land on ---
-# A platform is just a rectangle, same as the square.
+# A platform is just a rectangle the square can stand on.
 ground = pygame.Rect(0, 550, 800, 50)
 floating_platform = pygame.Rect(300, 400, 200, 20)
 platforms = [ground, floating_platform]
@@ -43,23 +41,25 @@ while running:
         square.x += speed
 
     # Jumping only works while standing on something
-    if keys[pygame.K_SPACE] and on_ground:
-        velocity_y = jump_strength
+    if keys[pygame.K_SPACE] and standing_on_something:
+        fall_speed = jump_power
 
-    # Gravity pulls the square down a little more each frame
-    velocity_y += gravity
-    square.y += velocity_y
-    on_ground = False
+    # Step 1: remember where the bottom of the square was before it moves
+    bottom_before = square.bottom
 
-    # Check if the square has landed on top of any platform
+    # Step 2: gravity speeds up the fall, then we actually move the square
+    fall_speed += gravity
+    square.y += fall_speed
+    standing_on_something = False
+
+    # Step 3: did the square just land on top of a platform?
     for platform in platforms:
-        if square.colliderect(platform):
-            falling = velocity_y > 0
-            was_above = (square.bottom - velocity_y) <= platform.top
-            if falling and was_above:
-                square.bottom = platform.top
-                velocity_y = 0
-                on_ground = True
+        square_was_above_platform = bottom_before <= platform.top
+        square_touches_platform_now = square.colliderect(platform)
+        if square_was_above_platform and square_touches_platform_now:
+            square.bottom = platform.top
+            fall_speed = 0
+            standing_on_something = True
 
     # Clear the screen
     screen.fill((209, 0, 28))
