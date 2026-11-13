@@ -94,7 +94,25 @@ select { font: inherit; border-radius: 9px; border: 1px solid var(--line); backg
 
 /* paint grid */
 .net { --cell: clamp(22px, 3.6vw, 36px); display: grid; grid-template-columns: repeat(12, var(--cell)); grid-template-rows: repeat(9, var(--cell)); gap: 3px; touch-action: none; user-select: none; justify-content: center; }
-.cell { border-radius: 5px; border: 1px solid rgba(0,0,0,0.25); cursor: crosshair; display: grid; place-items: center; font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: rgba(0,0,0,0.55); }
+.cell { position: relative; overflow: hidden; border-radius: 5px; border: 1px solid rgba(0,0,0,0.25); cursor: crosshair; display: grid; place-items: center; font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: rgba(0,0,0,0.55); }
+.cell .img { position: absolute; inset: 0; background-size: cover; background-position: center; pointer-events: none; }
+.cell .lbl { position: relative; pointer-events: none; }
+.cell .img:not([hidden]) + .lbl { color: #fff; text-shadow: 0 0 3px #000, 0 0 2px #000; }
+.cell .tag { position: absolute; right: 2px; bottom: 2px; width: 38%; height: 38%; border-radius: 50%; border: 1.5px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.5); pointer-events: none; }
+.cell.center { cursor: default; }
+.stk i { background-size: cover; background-position: center; }
+.swatch.photo { background-size: cover !important; background-position: center; border-width: 5px; }
+.photos { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.pcard { border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: grid; gap: 8px; align-content: start; }
+.pcard .row { display: flex; gap: 10px; align-items: center; font-weight: 600; }
+.pcard .thumb { width: 54px; height: 54px; flex: none; border-radius: 8px; background: var(--accent-soft) center / cover; display: grid; place-items: center; font-family: var(--font-mono); font-weight: 700; color: var(--muted); }
+.pcard p { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+.pcard button { padding: 7px 10px; font-size: 13.5px; }
+.aligner { display: grid; gap: 10px; justify-items: center; border: 1.5px dashed var(--accent); border-radius: 12px; padding: 14px; }
+.aligner h3 { margin: 0; font-family: var(--font-display); font-size: 16px; }
+#alignCanvas { width: min(100%, 320px); aspect-ratio: 1; border-radius: 8px; touch-action: none; cursor: move; background: #000; }
+.zoomrow { display: flex; gap: 8px; align-items: center; width: min(100%, 320px); color: var(--muted); font-size: 13px; }
+.zoomrow input { flex: 1; accent-color: var(--accent); }
 .net-wrap { overflow-x: auto; padding: 4px 0; }
 .palette { display: flex; flex-wrap: wrap; gap: 8px; }
 .swatch { width: 44px; height: 44px; border-radius: 10px; border: 2px solid rgba(0,0,0,0.2); padding: 0; }
@@ -116,7 +134,7 @@ kbd { font-family: var(--font-mono); font-size: 12px; border: 1px solid var(--li
 <div class="wrap">
   <header>
     <h1>Money Cube Solver <span class="serial">3×3 · PICTURE CUBE</span></h1>
-    <p>Paint your cube below, press Solve, and follow the turns. When the colors are done, this page also turns any center picture that's sideways or upside down.</p>
+    <p>Photograph your $100 cube, match each square to its face, press Solve, and follow the turns. Then fix any center picture that's sideways or upside down.</p>
   </header>
 
   <div class="grid">
@@ -159,12 +177,33 @@ kbd { font-family: var(--font-mono); font-size: 12px; border: 1px solid var(--li
     </div>
 
     <div class="col">
+      <section class="panel" aria-label="Photograph your cube">
+        <div class="panel-head">
+          <h2>1 · Photograph each face</h2>
+          <span class="eyebrow">For picture cubes</span>
+        </div>
+        <p class="note">Take a straight-on photo of each face. The page cuts it into 9 squares so you can see your real $100 pieces below. Photos stay on your device; nothing is uploaded.</p>
+        <div class="photos" id="photos"></div>
+        <div class="aligner" id="aligner" hidden>
+          <h3 id="alignTitle">Line up the face</h3>
+          <p class="note">Drag the photo and use the zoom slider until the 9 squares sit inside the grid lines.</p>
+          <canvas id="alignCanvas" width="480" height="480" aria-label="Photo alignment"></canvas>
+          <div class="zoomrow"><label for="zoom">Zoom</label><input type="range" id="zoom" min="0.4" max="4" step="0.01" value="1"></div>
+          <div class="controls">
+            <button id="btnRotate">↻ Rotate</button>
+            <button id="btnUsePhoto" class="primary">Use this photo</button>
+            <button id="btnCancelPhoto">Cancel</button>
+          </div>
+        </div>
+        <input type="file" id="fileInput" accept="image/*" hidden>
+      </section>
+
       <section class="panel" aria-label="Paint your cube">
         <div class="panel-head">
-          <h2>1 · Paint your cube</h2>
+          <h2>2 · Match each square to its face</h2>
           <span class="eyebrow">Click or drag</span>
         </div>
-        <p class="note">Each color stands for one of the six pictures on your cube. Paint every square with the picture it belongs to; the middle square of each face decides that face's picture. If the pictures look alike, stick a small colored dot on each piece first.</p>
+        <p class="note" id="paintNote">Every face's picture is set by its middle square, which never moves. Pick a center below, then click every square whose piece of $100 bill belongs on that face. A square's colored tag shows what you picked. No photos? The colors work on their own too.</p>
         <div class="palette" id="palette" role="group" aria-label="Paint color"></div>
         <div class="net-wrap"><div class="net" id="net"></div></div>
         <div class="controls">
@@ -177,7 +216,7 @@ kbd { font-family: var(--font-mono); font-size: 12px; border: 1px solid var(--li
 
       <section class="panel" aria-label="Fix twisted centers">
         <div class="panel-head">
-          <h2>2 · Fix twisted centers</h2>
+          <h2>3 · Fix twisted centers</h2>
           <span class="eyebrow">After the colors are solved</span>
         </div>
         <p class="note">Look at each center picture. How far does it need to turn, clockwise as you look straight at that face, to line up with the rest of the face?</p>
@@ -376,6 +415,21 @@ let moves = [], fixFrom = Infinity, step = 0;
 let busy = false, playing = false, solverReady = false;
 const need = { U: 0, R: 0, F: 0, D: 0, L: 0, B: 0 };
 
+// ----- photos of a picture cube -----
+const tiles = {};                      // tiles[face] = 9 image URLs cut from that face's photo
+let photoMode = false;
+let ident = [...Array(54).keys()];     // which photo square sits in each spot right now
+let tileU = STK.map(s => s.u);         // which way each photo square's "right" edge points in 3D
+const photoOf = t => (photoMode && tiles[STK[t].face] ? tiles[STK[t].face][STK[t].k] : null);
+function tileAngle(slot, t) {
+  const s = STK[slot], u = tileU[t];
+  if (same(u, s.u)) return 0;
+  if (same(u, s.v)) return 90;
+  if (same(u, mul(s.u, -1))) return 180;
+  return 270;
+}
+function resetTiles() { ident = [...Array(54).keys()]; tileU = STK.map(s => s.u); }
+
 function describe(m) {
   const f = m[0], t = turnsOf(m);
   if (t === 2) return `${FACE_NAMES[f]} side: turn twice`;
@@ -423,9 +477,18 @@ function layout() {
 const setView = () => { cube3d.style.transform = `rotateX(${viewX}deg) rotateY(${viewY}deg)`; };
 function paint3d() {
   stickerEls.forEach((el, i) => {
-    const face = el.firstChild;
-    face.style.background = colorVar(state[i]);
-    if (STK[i].k === 4) face.firstChild.style.transform = `rotate(${twists[STK[i].face] * 90}deg)`;
+    const face = el.firstChild, url = photoOf(ident[i]);
+    if (url) {
+      face.style.background = `url(${url}) center / cover`;
+      face.style.transform = `rotate(${tileAngle(i, ident[i])}deg)`;
+    } else {
+      face.style.background = colorVar(state[i]);
+      face.style.transform = '';
+    }
+    if (STK[i].k === 4) {
+      face.firstChild.hidden = !!url;
+      face.firstChild.style.transform = `rotate(${twists[STK[i].face] * 90}deg)`;
+    }
   });
 }
 const colorVar = c => (c < 0 ? 'var(--blank)' : `var(--c${c})`);
@@ -444,6 +507,9 @@ function animateMove(m, ms) {
       layer.forEach(i => { stickerEls[i].style.transform = `rotate3d(${axis},${angle * e}deg) ${bases[i]}`; });
       if (k < 1) return requestAnimationFrame(frame);
       layer.forEach(i => { stickerEls[i].style.transform = bases[i]; });
+      const ax = n.findIndex(x => x !== 0), times = (n[ax] > 0 ? 1 : 3) * t;
+      layer.forEach(i => { tileU[ident[i]] = rotate(tileU[ident[i]], ax, times); });
+      ident = applyMove(ident, m);
       state = applyMove(state, m);
       twists[f] = (twists[f] + t) % 4;
       paint3d();
@@ -477,19 +543,41 @@ const cells = STK.map((s, i) => {
   el.style.gridColumn = cx + (s.k % 3) + 1;
   el.style.gridRow = cy + Math.floor(s.k / 3) + 1;
   el.dataset.i = i;
-  if (s.k === 4) el.textContent = s.face;
+  el.innerHTML = `<span class="img" hidden></span><span class="lbl">${s.k === 4 ? s.face : ''}</span><span class="tag" hidden></span>`;
+  if (s.k === 4) el.classList.add('center');
   el.setAttribute('aria-label', `${FACE_NAMES[s.face]} face square ${s.k + 1}`);
   $('net').appendChild(el);
   return el;
 });
-function paintNet() { cells.forEach((el, i) => { el.style.background = colorVar(state[i]); }); }
+function paintNet() {
+  cells.forEach((el, i) => {
+    const [img, , tag] = el.children, url = photoOf(ident[i]);
+    img.hidden = !url;
+    tag.hidden = !url || STK[i].k === 4;
+    if (url) {
+      img.style.backgroundImage = `url(${url})`;
+      img.style.transform = `rotate(${tileAngle(i, ident[i])}deg)`;
+      el.style.background = 'var(--blank)';
+      tag.style.background = colorVar(state[i]);
+    } else {
+      el.style.background = colorVar(state[i]);
+    }
+  });
+  swatches.forEach((b, c) => {
+    const url = photoOf(c * 9 + 4);
+    b.classList.toggle('photo', !!url);
+    b.style.background = url ? `url(${url})` : `var(--c${c})`;
+    b.style.borderColor = url ? `var(--c${c})` : '';
+    b.title = url ? `${FACE_NAMES[FACES[c]]} face picture (${COLOR_NAMES[c]} tag)` : COLOR_NAMES[c];
+  });
+}
 (() => {
   let down = false;
   const hit = e => {
     const el = document.elementFromPoint(e.clientX, e.clientY);
     if (!el || !el.classList.contains('cell')) return;
     const i = +el.dataset.i;
-    if (state[i] === paintColor) return;
+    if (STK[i].k === 4 || state[i] === paintColor) return;   // centers never move, so they stay as they are
     state[i] = paintColor;
     edited();
   };
@@ -587,7 +675,7 @@ $('btnSolve').onclick = () => {
     render();
     setStatus(moves.length
       ? `Found a solution in ${moves.length} turns. Press Next (or Play) and copy each turn on your cube.`
-      : 'Your colors are already solved. If a center picture is turned, use step 2.');
+      : 'Your colors are already solved. If a center picture is turned, use step 3.');
   }, 30);
 };
 $('btnExample').onclick = () => {
@@ -599,15 +687,131 @@ $('btnExample').onclick = () => {
     last = f;
     s = applyMove(s, f + mods[Math.floor(Math.random() * 3)]);
   }
-  state = s; edited();
-  setStatus('Example scramble loaded. Press Solve to try it.');
+  state = s; photoMode = false; edited();
+  setStatus('Example scramble loaded (colors only). Press Solve to try it.');
 };
-$('btnReset').onclick = () => { if (busy) return; state = SOLVED.slice(); edited(); setStatus('Back to a solved cube.'); };
+$('btnReset').onclick = () => { if (busy) return; state = SOLVED.slice(); photoMode = false; edited(); setStatus('Back to a solved cube (colors only).'); };
 $('btnClear').onclick = () => {
   if (busy) return;
   state = STK.map((s, i) => (s.k === 4 ? Math.floor(i / 9) : -1));
+  photoMode = Object.keys(tiles).length > 0;
+  resetTiles();
   edited();
-  setStatus('Cleared. The centers stay so you know which face is which; paint the other 48 squares.');
+  setStatus('Cleared. The centers stay so you know which face is which; match the other 48 squares.');
+};
+
+// ----- taking and lining up photos -----
+const PHOTO_TIPS = {
+  U: 'Tip the cube toward you so the top faces you. The front ends up at the bottom of the photo.',
+  F: 'Hold it normally: front facing you, top on top.',
+  R: 'Turn the cube left so the right side faces you. Keep the top on top.',
+  L: 'Turn the cube right so the left side faces you. Keep the top on top.',
+  B: 'Turn the cube around so the back faces you. Keep the top on top.',
+  D: 'Tip the cube away from you so the bottom faces you. The front ends up at the top of the photo.',
+};
+let photoFace = null, align = null, photoTicket = 0;
+const photoCards = {};
+['F', 'U', 'R', 'L', 'B', 'D'].forEach(f => {
+  const card = document.createElement('div');
+  card.className = 'pcard';
+  card.innerHTML = `<div class="row"><span class="thumb">${f}</span>${FACE_NAMES[f]}</div><p>${PHOTO_TIPS[f]}</p>`;
+  const btn = document.createElement('button');
+  btn.textContent = 'Add photo';
+  btn.onclick = () => { if (busy) return; photoFace = f; $('fileInput').value = ''; $('fileInput').click(); };
+  card.appendChild(btn);
+  $('photos').appendChild(card);
+  photoCards[f] = { thumb: card.querySelector('.thumb'), btn };
+});
+const AC = $('alignCanvas'), actx = AC.getContext('2d');
+$('fileInput').addEventListener('change', () => {
+  const file = $('fileInput').files[0];
+  if (!file || !photoFace) return;
+  const ticket = ++photoTicket;
+  const img = new Image();
+  img.onload = () => {
+    if (ticket !== photoTicket) return;   // an older or already-used photo
+    align = { f: photoFace, img, base: Math.max(AC.width / img.width, AC.height / img.height), zoom: 1, ox: 0, oy: 0, rot: 0 };
+    $('zoom').value = 1;
+    $('alignTitle').textContent = `Line up the ${FACE_NAMES[photoFace]} face (${photoFace})`;
+    $('aligner').hidden = false;
+    drawAlign();
+    $('aligner').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  };
+  img.onerror = () => setStatus('That file could not be opened as a picture. Try a JPG or PNG photo.', true);
+  img.src = URL.createObjectURL(file);
+});
+function drawAligned(ctx, size) {
+  const a = align, k = size / AC.width;
+  ctx.save();
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, size, size);
+  ctx.translate(size / 2 + a.ox * k, size / 2 + a.oy * k);
+  ctx.rotate(a.rot * Math.PI / 2);
+  const sc = a.base * a.zoom * k;
+  ctx.scale(sc, sc);
+  ctx.drawImage(a.img, -a.img.width / 2, -a.img.height / 2);
+  ctx.restore();
+}
+function drawAlign() {
+  const W = AC.width;
+  drawAligned(actx, W);
+  actx.strokeStyle = 'rgba(255,255,255,0.95)';
+  actx.lineWidth = 3;
+  actx.shadowColor = '#000';
+  actx.shadowBlur = 4;
+  for (let i = 1; i < 3; i++) {
+    actx.beginPath(); actx.moveTo(i * W / 3, 0); actx.lineTo(i * W / 3, W); actx.stroke();
+    actx.beginPath(); actx.moveTo(0, i * W / 3); actx.lineTo(W, i * W / 3); actx.stroke();
+  }
+  actx.strokeRect(1.5, 1.5, W - 3, W - 3);
+  actx.shadowBlur = 0;
+}
+(() => {
+  let drag = null;
+  AC.addEventListener('pointerdown', e => { if (!align) return; drag = { x: e.clientX, y: e.clientY, ox: align.ox, oy: align.oy }; AC.setPointerCapture(e.pointerId); });
+  AC.addEventListener('pointermove', e => {
+    if (!drag) return;
+    const k = AC.width / AC.getBoundingClientRect().width;
+    align.ox = drag.ox + (e.clientX - drag.x) * k;
+    align.oy = drag.oy + (e.clientY - drag.y) * k;
+    drawAlign();
+  });
+  const end = () => { drag = null; };
+  AC.addEventListener('pointerup', end);
+  AC.addEventListener('pointercancel', end);
+})();
+$('zoom').addEventListener('input', () => { if (align) { align.zoom = +$('zoom').value; drawAlign(); } });
+$('btnRotate').onclick = () => { if (align) { align.rot = (align.rot + 1) % 4; drawAlign(); } };
+$('btnCancelPhoto').onclick = () => { photoTicket++; align = null; $('aligner').hidden = true; };
+$('btnUsePhoto').onclick = () => {
+  if (!align) return;
+  photoTicket++;
+  const f = align.f, big = document.createElement('canvas');
+  big.width = big.height = 300;
+  drawAligned(big.getContext('2d'), 300);
+  tiles[f] = [];
+  for (let k = 0; k < 9; k++) {
+    const t = document.createElement('canvas');
+    t.width = t.height = 100;
+    t.getContext('2d').drawImage(big, (k % 3) * 100, Math.floor(k / 3) * 100, 100, 100, 0, 0, 100, 100);
+    tiles[f].push(t.toDataURL('image/jpeg', 0.85));
+  }
+  photoCards[f].thumb.style.backgroundImage = `url(${big.toDataURL('image/jpeg', 0.8)})`;
+  photoCards[f].thumb.textContent = '';
+  photoCards[f].btn.textContent = 'Retake photo';
+  align = null;
+  $('aligner').hidden = true;
+  // a new photo describes the cube as it is now
+  const fi = FACES.indexOf(f);
+  if (!photoMode) state = STK.map((s, i) => (s.k === 4 ? Math.floor(i / 9) : -1));
+  for (let k = 0; k < 9; k++) if (k !== 4) state[fi * 9 + k] = -1;
+  photoMode = true;
+  resetTiles();
+  edited();
+  const left = FACES.filter(g => !tiles[g]).map(g => FACE_NAMES[g]);
+  setStatus(left.length
+    ? `${FACE_NAMES[f]} photo saved. Still to photograph: ${left.join(', ')}.`
+    : 'All 6 photos saved. Now match each square to its face in step 2, then press Solve.');
 };
 
 // ----- step player -----
@@ -622,7 +826,7 @@ async function next() {
     stop();
     setStatus(step > fixFrom
       ? 'Done! The centers should all be lined up now.'
-      : 'Colors solved! If any center picture is turned the wrong way, use step 2.');
+      : 'Colors solved! If any center picture is turned the wrong way, use step 3.');
   }
 }
 async function back() {
