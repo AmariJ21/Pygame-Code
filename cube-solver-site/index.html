@@ -1,0 +1,702 @@
+<title>Money Cube Solver</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: a two-column workbench. Left: the live 3D cube and the step player. Right: the paint grid and center fixer. Stacks on phones. */
+:root {
+  --bg: #e9efe8;
+  --panel: #f7faf5;
+  --ink: #15231a;
+  --muted: #56685b;
+  --line: #c9d6ca;
+  --accent: #1c6a44;
+  --accent-ink: #ffffff;
+  --accent-soft: #d5e8db;
+  --seal: #9a6f00;
+  --plastic: #101412;
+  --c0: #f5f5f0; --c1: #ffd21f; --c2: #13a04f; --c3: #1d5ad8; --c4: #d42a2a; --c5: #ff7a12; --blank: #8a958c;
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1510; --panel: #141f18; --ink: #e2ebe4; --muted: #92a596; --line: #27372c;
+    --accent: #43b077; --accent-ink: #04110a; --accent-soft: #1b3325; --seal: #e2b54b; --plastic: #030504;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1510; --panel: #141f18; --ink: #e2ebe4; --muted: #92a596; --line: #27372c;
+  --accent: #43b077; --accent-ink: #04110a; --accent-soft: #1b3325; --seal: #e2b54b; --plastic: #030504;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+}
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 20px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; }
+h1 { font-family: var(--font-display); font-size: clamp(26px, 4vw, 38px); margin: 0; letter-spacing: -0.02em; text-wrap: balance; }
+h1 .serial { font-family: var(--font-mono); font-size: 0.42em; color: var(--seal); letter-spacing: 0.08em; vertical-align: middle; margin-left: 8px; border: 1.5px solid var(--seal); padding: 2px 7px; border-radius: 4px; }
+header p { margin: 0; color: var(--muted); max-width: 62ch; }
+h2 { font-family: var(--font-display); font-size: 18px; margin: 0; letter-spacing: -0.01em; }
+.eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); font-weight: 600; }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 900px) {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .col { display: contents; }
+  .help { order: 9; }
+}
+.col { display: grid; gap: 20px; min-width: 0; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: grid; gap: 14px; min-width: 0; }
+.panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.note { color: var(--muted); font-size: 13.5px; margin: 0; }
+
+/* 3D cube */
+.stage { position: relative; height: 340px; perspective: 1000px; touch-action: none; cursor: grab; user-select: none;
+  background: radial-gradient(circle at 50% 45%, var(--accent-soft), transparent 70%); border-radius: 12px; }
+.stage:active { cursor: grabbing; }
+.cube3d { position: absolute; left: 50%; top: 50%; transform-style: preserve-3d; }
+.stk { position: absolute; background: var(--plastic); backface-visibility: hidden; padding: 3px; }
+.stk i { display: block; width: 100%; height: 100%; border-radius: 5px; position: relative; }
+.stk .mark { position: absolute; inset: 0; display: grid; place-items: start center; }
+.stk .mark::before { content: ""; width: 34%; height: 14%; margin-top: 10%; border-radius: 3px; background: rgba(0,0,0,0.55); }
+.stage-hint { position: absolute; bottom: 8px; right: 12px; font-size: 12px; color: var(--muted); }
+
+/* step player */
+.now { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 18px; align-items: center; }
+.now .move { font-family: var(--font-mono); font-weight: 700; font-size: 54px; line-height: 1; color: var(--accent); min-width: 2.2ch; grid-row: span 2; }
+.now .what { font-size: 18px; font-weight: 600; }
+.now .count { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button { font: inherit; font-weight: 600; border-radius: 9px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 9px 14px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button:focus-visible, select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+select { font: inherit; border-radius: 9px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 8px 10px; }
+.speed { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 13px; margin-left: auto; }
+.strip { display: flex; flex-wrap: wrap; gap: 5px; max-height: 160px; overflow-y: auto; }
+.chip { font-family: var(--font-mono); font-size: 13px; padding: 3px 7px; border-radius: 6px; border: 1px solid var(--line); color: var(--ink); min-width: 3.2ch; text-align: center; }
+.chip.done { opacity: 0.38; }
+.chip.cur { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.chip.fix { border-style: dashed; border-color: var(--seal); }
+.status { font-weight: 600; padding: 10px 12px; border-radius: 9px; background: var(--accent-soft); margin: 0; }
+.status.err { background: transparent; border: 1.5px solid #c0392b; color: var(--ink); }
+
+/* paint grid */
+.net { --cell: clamp(22px, 3.6vw, 36px); display: grid; grid-template-columns: repeat(12, var(--cell)); grid-template-rows: repeat(9, var(--cell)); gap: 3px; touch-action: none; user-select: none; justify-content: center; }
+.cell { border-radius: 5px; border: 1px solid rgba(0,0,0,0.25); cursor: crosshair; display: grid; place-items: center; font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: rgba(0,0,0,0.55); }
+.net-wrap { overflow-x: auto; padding: 4px 0; }
+.palette { display: flex; flex-wrap: wrap; gap: 8px; }
+.swatch { width: 44px; height: 44px; border-radius: 10px; border: 2px solid rgba(0,0,0,0.2); padding: 0; }
+.swatch[aria-pressed="true"] { outline: 3px solid var(--ink); outline-offset: 3px; }
+
+/* centers */
+.centers { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.cface { border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: grid; gap: 8px; }
+.cface .top { display: flex; gap: 8px; align-items: center; font-weight: 600; }
+.cface .dot { width: 18px; height: 18px; border-radius: 5px; border: 1px solid rgba(0,0,0,0.25); }
+.seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.seg button { padding: 6px 0; font-size: 13px; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+ol.how { margin: 0; padding-left: 20px; display: grid; gap: 6px; color: var(--ink); }
+kbd { font-family: var(--font-mono); font-size: 12px; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Money Cube Solver <span class="serial">3×3 · PICTURE CUBE</span></h1>
+    <p>Paint your cube below, press Solve, and follow the turns. When the colors are done, this page also turns any center picture that's sideways or upside down.</p>
+  </header>
+
+  <div class="grid">
+    <div class="col">
+      <section class="panel" aria-label="Cube and steps">
+        <div class="stage" id="stage">
+          <div class="cube3d" id="cube3d"></div>
+          <span class="stage-hint">Drag to look around</span>
+        </div>
+        <div class="now">
+          <div class="move" id="nowMove">—</div>
+          <div class="what" id="nowWhat">Press Solve to get your turns</div>
+          <div class="count" id="nowCount">Hold the cube with the F center facing you and the U center on top.</div>
+        </div>
+        <div class="controls">
+          <button id="btnBack" aria-label="Previous step">◀ Back</button>
+          <button id="btnPlay">▶ Play</button>
+          <button id="btnNext" class="primary" aria-label="Next step">Next ▶</button>
+          <label class="speed" for="speed">Speed
+            <select id="speed">
+              <option value="2200">Slow</option>
+              <option value="1300" selected>Normal</option>
+              <option value="700">Fast</option>
+            </select>
+          </label>
+        </div>
+        <div class="strip" id="strip" aria-label="All moves"></div>
+        <p class="status" id="status">Getting the solver ready…</p>
+      </section>
+
+      <section class="panel help">
+        <h2>How to read the moves</h2>
+        <ol class="how">
+          <li>Each letter is a side: <b>U</b> top, <b>D</b> bottom, <b>R</b> right, <b>L</b> left, <b>F</b> front, <b>B</b> back.</li>
+          <li>A letter alone means turn that side clockwise, as if you were looking straight at it. <b>'</b> means counter-clockwise. <b>2</b> means turn it twice.</li>
+          <li>Never turn the whole cube while you follow along. The plain words under the big letter tell you which way to turn.</li>
+          <li>Keys: <kbd>→</kbd> next, <kbd>←</kbd> back, <kbd>Space</kbd> play or pause.</li>
+        </ol>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="panel" aria-label="Paint your cube">
+        <div class="panel-head">
+          <h2>1 · Paint your cube</h2>
+          <span class="eyebrow">Click or drag</span>
+        </div>
+        <p class="note">Each color stands for one of the six pictures on your cube. Paint every square with the picture it belongs to; the middle square of each face decides that face's picture. If the pictures look alike, stick a small colored dot on each piece first.</p>
+        <div class="palette" id="palette" role="group" aria-label="Paint color"></div>
+        <div class="net-wrap"><div class="net" id="net"></div></div>
+        <div class="controls">
+          <button id="btnSolve" class="primary">Solve</button>
+          <button id="btnExample">Example scramble</button>
+          <button id="btnReset">Solved cube</button>
+          <button id="btnClear">Clear</button>
+        </div>
+      </section>
+
+      <section class="panel" aria-label="Fix twisted centers">
+        <div class="panel-head">
+          <h2>2 · Fix twisted centers</h2>
+          <span class="eyebrow">After the colors are solved</span>
+        </div>
+        <p class="note">Look at each center picture. How far does it need to turn, clockwise as you look straight at that face, to line up with the rest of the face?</p>
+        <div class="centers" id="centers"></div>
+        <div class="controls">
+          <button id="btnCenters" class="primary">Make center fix</button>
+          <span class="note" id="centerNote"></span>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/cubejs@1.3.2/lib/cube.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cubejs@1.3.2/lib/solve.js"></script>
+
+<script id="engine">
+// ---------- Cube model: 54 stickers, each with a 3D position and the way it faces ----------
+const FACES = ['U', 'R', 'F', 'D', 'L', 'B'];
+const NORM = { U: [0, 1, 0], R: [1, 0, 0], F: [0, 0, 1], D: [0, -1, 0], L: [-1, 0, 0], B: [0, 0, -1] };
+// u = direction of the columns, v = direction going down the rows, as seen looking at that face
+const UV = {
+  F: [[1, 0, 0], [0, -1, 0]], B: [[-1, 0, 0], [0, -1, 0]],
+  R: [[0, 0, -1], [0, -1, 0]], L: [[0, 0, 1], [0, -1, 0]],
+  U: [[1, 0, 0], [0, 0, 1]], D: [[1, 0, 0], [0, 0, -1]],
+};
+const OPP = { U: 'D', D: 'U', R: 'L', L: 'R', F: 'B', B: 'F' };
+const add = (a, b) => a.map((x, i) => x + b[i]);
+const mul = (a, s) => a.map(x => x * s);
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const same = (a, b) => a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
+const faceOfVec = v => FACES.find(f => same(NORM[f], v));
+
+const STK = [];
+FACES.forEach(f => {
+  const [u, v] = UV[f];
+  for (let k = 0; k < 9; k++) {
+    const r = Math.floor(k / 3), c = k % 3;
+    STK.push({ face: f, k, n: NORM[f], u, v, pos: add(add(NORM[f], mul(u, c - 1)), mul(v, r - 1)) });
+  }
+});
+const key = (p, n) => p.join() + '|' + n.join();
+const LOOKUP = new Map(STK.map((s, i) => [key(s.pos, s.n), i]));
+
+function rotate(vec, axis, times) {
+  let r = vec;
+  for (let t = 0; t < times; t++) {
+    const [x, y, z] = r;
+    r = axis === 0 ? [x, z, -y] : axis === 1 ? [-z, y, x] : [y, -x, z];
+  }
+  return r;
+}
+const LAYER = {};   // which stickers turn with each face
+const PERM = {};    // PERM[f][newIndex] = oldIndex for one clockwise quarter turn
+FACES.forEach(f => {
+  const axis = NORM[f].findIndex(x => x !== 0), sign = NORM[f][axis];
+  const times = sign > 0 ? 1 : 3;   // clockwise seen from the negative side = 3 turns seen from the positive side
+  const perm = [...Array(54).keys()];
+  LAYER[f] = [];
+  STK.forEach((s, i) => {
+    if (s.pos[axis] !== sign) return;
+    LAYER[f].push(i);
+    perm[LOOKUP.get(key(rotate(s.pos, axis, times), rotate(s.n, axis, times)))] = i;
+  });
+  PERM[f] = perm;
+});
+
+const turnsOf = m => (m[1] === "'" ? 3 : m[1] === '2' ? 2 : 1);
+function applyMove(state, m) {
+  let s = state;
+  for (let t = 0; t < turnsOf(m); t++) s = PERM[m[0]].map(i => s[i]);
+  return s;
+}
+const applyAlg = (state, moves) => moves.reduce(applyMove, state);
+const SOLVED = STK.map((s, i) => Math.floor(i / 9));
+const isSolved = st => st.every((c, i) => c === st[Math.floor(i / 9) * 9 + 4]);
+
+// ---------- Checking that a painted cube is possible ----------
+function checkCube(st) {
+  if (st.some(c => c < 0)) return 'Some squares are still gray. Paint all 54 squares.';
+  const counts = [0, 0, 0, 0, 0, 0];
+  st.forEach(c => counts[c]++);
+  for (let c = 0; c < 6; c++) if (counts[c] !== 9) return `${COLOR_NAMES[c]} is used ${counts[c]} times. Each color needs exactly 9.`;
+  const centerColor = {};
+  FACES.forEach((f, i) => { centerColor[f] = st[i * 9 + 4]; });
+  if (new Set(Object.values(centerColor)).size !== 6) return 'Two centers have the same color. Each face needs its own center color.';
+  const colorAt = (pos, n) => st[LOOKUP.get(key(pos, n))];
+  const faceColor = n => centerColor[faceOfVec(n)];
+  const isUD = c => c === centerColor.U || c === centerColor.D;
+  const isFB = c => c === centerColor.F || c === centerColor.B;
+
+  // corners
+  const cornerPos = [];
+  for (const x of [-1, 1]) for (const y of [-1, 1]) for (const z of [-1, 1]) cornerPos.push([x, y, z]);
+  const cornerNormals = p => {
+    const a = [0, p[1], 0];
+    const others = [[p[0], 0, 0], [0, 0, p[2]]];
+    const b = others.find(o => cross(a, o).reduce((s, x, i) => s + x * p[i], 0) > 0);
+    const c = others.find(o => o !== b);
+    return [a, b, c];
+  };
+  const cornerId = colors => colors.slice().sort().join();
+  const solvedCorners = cornerPos.map(p => cornerId(cornerNormals(p).map(faceColor)));
+  const cPerm = [], seenC = new Set();
+  let twist = 0;
+  for (const p of cornerPos) {
+    const ns = cornerNormals(p), cols = ns.map(n => colorAt(p, n));
+    const id = solvedCorners.indexOf(cornerId(cols));
+    if (id < 0 || seenC.has(id)) return 'One of the corners has a color mix that does not exist on your cube. Check the corners again.';
+    seenC.add(id); cPerm.push(id);
+    twist += cols.findIndex(isUD);
+  }
+  if (twist % 3 !== 0) return 'A corner looks twisted in place. Check the corner colors; a real cube can’t be in this position.';
+
+  // edges
+  const edgePos = [];
+  for (const x of [-1, 0, 1]) for (const y of [-1, 0, 1]) for (const z of [-1, 0, 1])
+    if (Math.abs(x) + Math.abs(y) + Math.abs(z) === 2) edgePos.push([x, y, z]);
+  const edgeNormals = p => {
+    const ns = [0, 1, 2].filter(i => p[i] !== 0).map(i => { const n = [0, 0, 0]; n[i] = p[i]; return n; });
+    const ref = ns.find(n => n[1] !== 0) || ns.find(n => n[2] !== 0);
+    return [ref, ns.find(n => n !== ref)];
+  };
+  const solvedEdges = edgePos.map(p => cornerId(edgeNormals(p).map(faceColor)));
+  const ePerm = [], seenE = new Set();
+  let flips = 0;
+  for (const p of edgePos) {
+    const ns = edgeNormals(p), cols = ns.map(n => colorAt(p, n));
+    const id = solvedEdges.indexOf(cornerId(cols));
+    if (id < 0 || seenE.has(id)) return 'One of the edge pieces has a color pair that does not exist on your cube. Check the edges again.';
+    seenE.add(id); ePerm.push(id);
+    const refColor = cols.find(isUD) ?? cols.find(isFB);
+    if (cols[0] !== refColor) flips++;
+  }
+  if (flips % 2) return 'An edge looks flipped. Check the edge colors; a real cube can’t be in this position.';
+  if (parity(cPerm) !== parity(ePerm)) return 'Two pieces look swapped. Check your painting; a real cube can’t be in this position.';
+  return null;
+}
+function parity(p) {
+  const seen = new Array(p.length).fill(false);
+  let swaps = 0;
+  for (let i = 0; i < p.length; i++) {
+    if (seen[i]) continue;
+    let j = i, len = 0;
+    while (!seen[j]) { seen[j] = true; j = p[j]; len++; }
+    swaps += len - 1;
+  }
+  return swaps % 2;
+}
+
+// ---------- Turning the center pictures ----------
+// Found by computer search and checked: these only turn center pictures, every piece goes back home.
+const repeat = (s, n) => Array(n).fill(s).join(' ').split(' ');
+const PAIR_PLUS = repeat("R F R' U'", 7);   // U center +90°, F center −90°
+const PAIR_MINUS = repeat("U R F' R'", 7);  // U center −90°, F center +90°
+const HALF = repeat("U R L U2 R' L'", 2);   // U center 180°
+const adjacent = (a, b) => a !== b && OPP[a] !== b;
+function relabel(moves, top, front) {
+  const right = faceOfVec(cross(NORM[top], NORM[front]));
+  const map = { U: top, F: front, R: right, D: OPP[top], B: OPP[front], L: OPP[right] };
+  return moves.map(m => map[m[0]] + m.slice(1));
+}
+function pairFix(x, y, d) {   // x turns d quarter (±1), y turns the other way
+  if (!adjacent(x, y)) {
+    const z = FACES.find(f => adjacent(f, x) && adjacent(f, y));
+    return pairFix(x, z, d).concat(pairFix(z, y, d));
+  }
+  return relabel(d > 0 ? PAIR_PLUS : PAIR_MINUS, x, y);
+}
+function centerFix(need) {   // need[f] = clockwise quarter turns each center needs (0-3)
+  need = { ...need };
+  const odd = () => FACES.filter(f => need[f] % 2);
+  if (odd().length % 2) return null;
+  let moves = [];
+  while (odd().length) {
+    const [x, y] = odd();
+    const d = need[x] === 1 ? 1 : -1;
+    moves = moves.concat(pairFix(x, y, d));
+    need[x] = (need[x] - d + 4) % 4;
+    need[y] = (need[y] + d + 4) % 4;
+  }
+  FACES.forEach(f => { if (need[f] === 2) moves = moves.concat(relabel(HALF, f, FACES.find(g => adjacent(f, g)))); });
+  return moves;
+}
+const COLOR_NAMES = ['White', 'Yellow', 'Green', 'Blue', 'Red', 'Orange'];
+</script>
+
+<script>
+// ---------- Page ----------
+const $ = id => document.getElementById(id);
+const FACE_NAMES = { U: 'Top', D: 'Bottom', R: 'Right', L: 'Left', F: 'Front', B: 'Back' };
+let state = SOLVED.slice();
+let twists = { U: 0, R: 0, F: 0, D: 0, L: 0, B: 0 };
+let paintColor = 0;
+let moves = [], fixFrom = Infinity, step = 0;
+let busy = false, playing = false, solverReady = false;
+const need = { U: 0, R: 0, F: 0, D: 0, L: 0, B: 0 };
+
+function describe(m) {
+  const f = m[0], t = turnsOf(m);
+  if (t === 2) return `${FACE_NAMES[f]} side: turn twice`;
+  const cw = t === 1;
+  const words = {
+    U: cw ? 'Top layer: turn to the left' : 'Top layer: turn to the right',
+    D: cw ? 'Bottom layer: turn to the right' : 'Bottom layer: turn to the left',
+    R: cw ? 'Right side: turn up, away from you' : 'Right side: turn down, toward you',
+    L: cw ? 'Left side: turn down, toward you' : 'Left side: turn up, away from you',
+    F: cw ? 'Front: turn clockwise' : 'Front: turn counter-clockwise',
+    B: cw ? 'Back: turn counter-clockwise (seen from the front)' : 'Back: turn clockwise (seen from the front)',
+  };
+  return words[f];
+}
+
+// ----- 3D view -----
+const cube3d = $('cube3d');
+let S = 52, viewX = -28, viewY = -38;
+const stickerEls = STK.map((s, i) => {
+  const el = document.createElement('div');
+  el.className = 'stk';
+  const face = document.createElement('i');
+  if (s.k === 4) { const mk = document.createElement('span'); mk.className = 'mark'; face.appendChild(mk); }
+  el.appendChild(face);
+  cube3d.appendChild(el);
+  return el;
+});
+function baseTransform(s) {
+  const P = mul(add(s.pos, mul(s.n, 0.5)), S);
+  const c = v => [v[0], -v[1], v[2]];   // screen y goes down
+  const [u, v, n, p] = [c(s.u), c(s.v), c(s.n), c(P)];
+  return `matrix3d(${u},0,${v},0,${n},0,${p},1)`;
+}
+let bases = [];
+function layout() {
+  S = $('stage').clientWidth < 420 ? 40 : 52;
+  bases = STK.map(baseTransform);
+  stickerEls.forEach((el, i) => {
+    el.style.width = el.style.height = S + 'px';
+    el.style.left = el.style.top = -S / 2 + 'px';
+    el.style.transform = bases[i];
+  });
+  setView();
+}
+const setView = () => { cube3d.style.transform = `rotateX(${viewX}deg) rotateY(${viewY}deg)`; };
+function paint3d() {
+  stickerEls.forEach((el, i) => {
+    const face = el.firstChild;
+    face.style.background = colorVar(state[i]);
+    if (STK[i].k === 4) face.firstChild.style.transform = `rotate(${twists[STK[i].face] * 90}deg)`;
+  });
+}
+const colorVar = c => (c < 0 ? 'var(--blank)' : `var(--c${c})`);
+
+function animateMove(m, ms) {
+  return new Promise(resolve => {
+    const f = m[0], n = NORM[f], t = turnsOf(m), angle = (t === 3 ? -90 : 90 * t);
+    const axis = `${n[0]},${-n[1]},${n[2]}`;
+    const layer = LAYER[f];
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const dur = reduce ? 0 : ms;
+    const start = performance.now();
+    function frame(now) {
+      const k = dur ? Math.min(1, (now - start) / dur) : 1;
+      const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      layer.forEach(i => { stickerEls[i].style.transform = `rotate3d(${axis},${angle * e}deg) ${bases[i]}`; });
+      if (k < 1) return requestAnimationFrame(frame);
+      layer.forEach(i => { stickerEls[i].style.transform = bases[i]; });
+      state = applyMove(state, m);
+      twists[f] = (twists[f] + t) % 4;
+      paint3d();
+      resolve();
+    }
+    requestAnimationFrame(frame);
+  });
+}
+
+// drag to look around
+(() => {
+  let drag = null;
+  $('stage').addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, vx: viewX, vy: viewY }; $('stage').setPointerCapture(e.pointerId); });
+  $('stage').addEventListener('pointermove', e => {
+    if (!drag) return;
+    viewY = drag.vy + (e.clientX - drag.x) * 0.5;
+    viewX = Math.max(-85, Math.min(85, drag.vx - (e.clientY - drag.y) * 0.5));
+    setView();
+  });
+  const end = () => { drag = null; };
+  $('stage').addEventListener('pointerup', end);
+  $('stage').addEventListener('pointercancel', end);
+})();
+
+// ----- paint grid -----
+const NET_POS = { U: [3, 0], L: [0, 3], F: [3, 3], R: [6, 3], B: [9, 3], D: [3, 6] };
+const cells = STK.map((s, i) => {
+  const el = document.createElement('div');
+  el.className = 'cell';
+  const [cx, cy] = NET_POS[s.face];
+  el.style.gridColumn = cx + (s.k % 3) + 1;
+  el.style.gridRow = cy + Math.floor(s.k / 3) + 1;
+  el.dataset.i = i;
+  if (s.k === 4) el.textContent = s.face;
+  el.setAttribute('aria-label', `${FACE_NAMES[s.face]} face square ${s.k + 1}`);
+  $('net').appendChild(el);
+  return el;
+});
+function paintNet() { cells.forEach((el, i) => { el.style.background = colorVar(state[i]); }); }
+(() => {
+  let down = false;
+  const hit = e => {
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    if (!el || !el.classList.contains('cell')) return;
+    const i = +el.dataset.i;
+    if (state[i] === paintColor) return;
+    state[i] = paintColor;
+    edited();
+  };
+  $('net').addEventListener('pointerdown', e => { if (busy) return; down = true; $('net').setPointerCapture(e.pointerId); hit(e); });
+  $('net').addEventListener('pointermove', e => { if (down) hit(e); });
+  const end = () => { down = false; };
+  $('net').addEventListener('pointerup', end);
+  $('net').addEventListener('pointercancel', end);
+})();
+const swatches = COLOR_NAMES.map((name, c) => {
+  const b = document.createElement('button');
+  b.className = 'swatch';
+  b.style.background = `var(--c${c})`;
+  b.setAttribute('aria-label', name);
+  b.title = name;
+  b.onclick = () => { paintColor = c; swatches.forEach((s, j) => s.setAttribute('aria-pressed', j === c)); };
+  b.setAttribute('aria-pressed', c === 0);
+  $('palette').appendChild(b);
+  return b;
+});
+
+function edited() {
+  stop();
+  moves = []; step = 0; fixFrom = Infinity;
+  twists = { U: 0, R: 0, F: 0, D: 0, L: 0, B: 0 };
+  render();
+  setStatus('Painting. Press Solve when every square matches your cube.');
+}
+
+// ----- centers -----
+const SEG = [['OK', 0], ['↻ ¼', 1], ['½', 2], ['↺ ¼', 3]];
+const centerBtns = {};
+FACES.forEach(f => {
+  const box = document.createElement('div');
+  box.className = 'cface';
+  box.innerHTML = `<div class="top"><span class="dot" id="dot${f}"></span>${FACE_NAMES[f]} (${f})</div>`;
+  const seg = document.createElement('div');
+  seg.className = 'seg';
+  seg.setAttribute('role', 'group');
+  seg.setAttribute('aria-label', `${FACE_NAMES[f]} center turn`);
+  centerBtns[f] = SEG.map(([label, v]) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.title = ['Already lined up', 'Needs a quarter turn clockwise', 'Needs a half turn', 'Needs a quarter turn counter-clockwise'][v];
+    b.onclick = () => { need[f] = v; renderCenters(); };
+    seg.appendChild(b);
+    return b;
+  });
+  box.appendChild(seg);
+  $('centers').appendChild(box);
+});
+function renderCenters() {
+  FACES.forEach((f, fi) => {
+    centerBtns[f].forEach((b, v) => b.setAttribute('aria-pressed', need[f] === v));
+    $('dot' + f).style.background = colorVar(state[fi * 9 + 4]);
+  });
+  const total = FACES.reduce((s, f) => s + (need[f] % 2), 0);
+  $('centerNote').textContent = total % 2
+    ? 'An odd number of quarter turns can’t happen on a real cube. Look again: one of them is probably a half turn or the other way.'
+    : '';
+}
+$('btnCenters').onclick = () => {
+  if (busy) return;
+  if (!isSolved(state)) return setStatus('Solve the colors first, then fix the centers. (Or press Solved cube if yours is already solved.)', true);
+  const fix = centerFix(need);
+  if (!fix) return renderCenters();
+  if (!fix.length) return setStatus('All centers are already lined up. Nothing to do.');
+  stop();
+  moves = moves.slice(0, step);
+  fixFrom = moves.length;
+  moves = moves.concat(fix);
+  // show the center marks the way the real cube looks now, so they end up straight
+  FACES.forEach(f => { twists[f] = (4 - need[f]) % 4; need[f] = 0; });
+  render(); renderCenters();
+  setStatus(`Center fix ready: ${fix.length} turns. Every piece comes back to where it was; only the centers turn.`);
+};
+
+// ----- solving -----
+function setStatus(text, err = false) { $('status').textContent = text; $('status').classList.toggle('err', err); }
+$('btnSolve').onclick = () => {
+  if (busy) return;
+  if (!solverReady) return setStatus('The solver is still getting ready. Try again in a moment.');
+  const problem = checkCube(state);
+  if (problem) return setStatus(problem, true);
+  const letterOf = {};
+  FACES.forEach((f, i) => { letterOf[state[i * 9 + 4]] = f; });
+  const facelets = state.map(c => letterOf[c]).join('');
+  stop();
+  twists = { U: 0, R: 0, F: 0, D: 0, L: 0, B: 0 };
+  setStatus('Thinking…');
+  setTimeout(() => {
+    const answer = Cube.fromString(facelets).solve().trim();
+    moves = answer ? answer.split(/\s+/) : [];
+    step = 0; fixFrom = Infinity;
+    render();
+    setStatus(moves.length
+      ? `Found a solution in ${moves.length} turns. Press Next (or Play) and copy each turn on your cube.`
+      : 'Your colors are already solved. If a center picture is turned, use step 2.');
+  }, 30);
+};
+$('btnExample').onclick = () => {
+  if (busy) return;
+  const sides = 'URFDLB', mods = ['', "'", '2'];
+  let s = SOLVED.slice(), last = '';
+  for (let i = 0; i < 22; i++) {
+    let f; do { f = sides[Math.floor(Math.random() * 6)]; } while (f === last);
+    last = f;
+    s = applyMove(s, f + mods[Math.floor(Math.random() * 3)]);
+  }
+  state = s; edited();
+  setStatus('Example scramble loaded. Press Solve to try it.');
+};
+$('btnReset').onclick = () => { if (busy) return; state = SOLVED.slice(); edited(); setStatus('Back to a solved cube.'); };
+$('btnClear').onclick = () => {
+  if (busy) return;
+  state = STK.map((s, i) => (s.k === 4 ? Math.floor(i / 9) : -1));
+  edited();
+  setStatus('Cleared. The centers stay so you know which face is which; paint the other 48 squares.');
+};
+
+// ----- step player -----
+async function next() {
+  if (busy || step >= moves.length) return;
+  busy = true;
+  await animateMove(moves[step], Math.min(450, +$('speed').value * 0.4));
+  step++;
+  busy = false;
+  render();
+  if (step === moves.length) {
+    stop();
+    setStatus(step > fixFrom
+      ? 'Done! The centers should all be lined up now.'
+      : 'Colors solved! If any center picture is turned the wrong way, use step 2.');
+  }
+}
+async function back() {
+  if (busy || step === 0) return;
+  busy = true;
+  stop();
+  const m = moves[step - 1];
+  const inv = m[1] === "'" ? m[0] : m[1] === '2' ? m : m[0] + "'";
+  await animateMove(inv, 300);
+  step--;
+  busy = false;
+  render();
+}
+let timer = null;
+function play() {
+  if (step >= moves.length) return;
+  playing = true;
+  $('btnPlay').textContent = '❚❚ Pause';
+  const tick = async () => {
+    if (!playing) return;
+    await next();
+    if (playing && step < moves.length) timer = setTimeout(tick, +$('speed').value);
+  };
+  tick();
+}
+function stop() { playing = false; clearTimeout(timer); $('btnPlay').textContent = '▶ Play'; }
+$('btnNext').onclick = () => { stop(); next(); };
+$('btnBack').onclick = back;
+$('btnPlay').onclick = () => (playing ? stop() : play());
+document.addEventListener('keydown', e => {
+  if (e.target.closest('select')) return;
+  if (e.key === 'ArrowRight') { e.preventDefault(); stop(); next(); }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); back(); }
+  if (e.key === ' ' && !e.target.closest('button')) { e.preventDefault(); playing ? stop() : play(); }
+});
+
+function render() {
+  paint3d(); paintNet(); renderCenters();
+  const m = moves[step];
+  $('nowMove').textContent = m || (moves.length ? '✓' : '—');
+  $('nowWhat').textContent = m ? describe(m) : (moves.length ? 'All turns done' : 'Press Solve to get your turns');
+  $('nowCount').textContent = m
+    ? (step >= fixFrom
+      ? `Center fix · Step ${step - fixFrom + 1} of ${moves.length - fixFrom}`
+      : `Step ${step + 1} of ${Math.min(moves.length, fixFrom)}`)
+    : 'Hold the cube with the F center facing you and the U center on top.';
+  $('btnNext').disabled = !m;
+  $('btnPlay').disabled = !m;
+  $('btnBack').disabled = step === 0;
+  const strip = $('strip');
+  strip.innerHTML = '';
+  moves.forEach((mv, i) => {
+    const c = document.createElement('span');
+    c.className = 'chip' + (i < step ? ' done' : '') + (i === step ? ' cur' : '') + (i >= fixFrom ? ' fix' : '');
+    c.textContent = mv;
+    strip.appendChild(c);
+  });
+  const cur = strip.querySelector('.cur');
+  if (cur) strip.scrollTop = cur.offsetTop - strip.offsetTop - 40;
+}
+
+layout();
+window.addEventListener('resize', layout);
+render();
+// Start with an example so the page shows what it does
+$('btnExample').click();
+setStatus('Getting the solver ready… (a few seconds)');
+setTimeout(() => {
+  try {
+    Cube.initSolver();
+    solverReady = true;
+    setStatus('Ready. This is an example scramble; paint your own cube or press Solve to try it.');
+  } catch (err) {
+    setStatus('The solver could not load. Check your internet connection and reload the page.', true);
+  }
+}, 60);
+</script>
