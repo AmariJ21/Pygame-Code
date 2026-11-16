@@ -126,6 +126,26 @@ select { font: inherit; border-radius: 9px; border: 1px solid var(--line); backg
 .seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
 .seg button { padding: 6px 0; font-size: 13px; }
 .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.names { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.names label { display: grid; gap: 3px; font-size: 12px; color: var(--muted); font-weight: 600; }
+.names .inrow { display: flex; gap: 6px; align-items: center; }
+.names input { font: inherit; font-size: 14px; width: 100%; min-width: 0; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); padding: 6px 8px; }
+.names input:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+.tablewrap { overflow-x: auto; max-height: 420px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; }
+table.pieces { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.pieces th { position: sticky; top: 0; background: var(--panel); text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.pieces td { padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.pieces tr.kind td { background: var(--accent-soft); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+.pieces tbody tr[data-p] { cursor: pointer; }
+.pieces tbody tr[data-p]:hover td, .pieces tbody tr.sel td { background: var(--accent-soft); }
+.pieces tbody tr.sel td:first-child { box-shadow: inset 4px 0 0 var(--accent); }
+.pieces .code { font-family: var(--font-mono); font-weight: 700; }
+.pics { display: flex; flex-wrap: wrap; gap: 4px; }
+.pic { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px 1px 3px; white-space: nowrap; }
+.pic b { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.3); }
+.where { white-space: nowrap; }
+.where.moved { color: var(--seal); font-weight: 600; }
+.stk.hl i { box-shadow: inset 0 0 0 4px #ffe14d, 0 0 10px 2px #ffe14d; }
 ol.how { margin: 0; padding-left: 20px; display: grid; gap: 6px; color: var(--ink); }
 kbd { font-family: var(--font-mono); font-size: 12px; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
@@ -173,6 +193,25 @@ kbd { font-family: var(--font-mono); font-size: 12px; border: 1px solid var(--li
           <li>Never turn the whole cube while you follow along. The plain words under the big letter tell you which way to turn.</li>
           <li>Keys: <kbd>→</kbd> next, <kbd>←</kbd> back, <kbd>Space</kbd> play or pause.</li>
         </ol>
+      </section>
+
+      <section class="panel" aria-label="Piece chart">
+        <div class="panel-head">
+          <h2>Piece chart</h2>
+          <span class="eyebrow">8 corners · 12 edges · 6 centers</span>
+        </div>
+        <p class="note">Every piece is a fixed mix of face pictures. A corner always carries the same 3, an edge the same 2. Name your 6 face pictures and the chart fills in. Click a row to light up where that piece is right now on the 3D cube.</p>
+        <div class="names" id="names"></div>
+        <div class="tablewrap">
+          <table class="pieces">
+            <thead><tr><th scope="col">Piece</th><th scope="col">Pictures on it</th><th scope="col">Home spot</th><th scope="col">Right now</th></tr></thead>
+            <tbody id="pieceRows"></tbody>
+          </table>
+        </div>
+        <div class="controls">
+          <button id="btnCopyChart">Copy chart as text</button>
+          <span class="note" id="copyNote"></span>
+        </div>
       </section>
     </div>
 
@@ -863,8 +902,95 @@ document.addEventListener('keydown', e => {
   if (e.key === ' ' && !e.target.closest('button')) { e.preventDefault(); playing ? stop() : play(); }
 });
 
+// ----- piece chart: every piece and the face pictures it carries -----
+const SPOT_WORDS = { U: 'Top', D: 'Bottom', F: 'Front', B: 'Back', R: 'Right', L: 'Left' };
+const PIECES = [];
+for (const y of [1, 0, -1]) for (const z of [1, 0, -1]) for (const x of [1, 0, -1]) {
+  const p = [x, y, z];
+  const size = Math.abs(x) + Math.abs(y) + Math.abs(z);
+  if (size === 0) continue;
+  // name order: top/bottom, then front/back, then right/left
+  const normals = [[0, y, 0], [0, 0, z], [x, 0, 0]].filter(n => n.some(v => v));
+  const faces = normals.map(faceOfVec);
+  PIECES.push({ pos: p, faces, code: faces.join(''), kind: size, stickers: normals.map(n => LOOKUP.get(key(p, n))) });
+}
+const KIND_NAMES = { 3: 'Corners (3 pictures each)', 2: 'Edges (2 pictures each)', 1: 'Centers (1 picture, never move)' };
+const spotName = pc => pc.faces.map(f => SPOT_WORDS[f]).join('-');
+let picNames = {};
+try { picNames = JSON.parse(localStorage.getItem('moneyCubePicNames') || '{}') || {}; } catch (e) { picNames = {}; }
+const picName = f => (picNames[f] && picNames[f].trim()) || `${FACE_NAMES[f]} picture`;
+let selectedPiece = null;
+
+FACES.forEach((f, c) => {
+  const lab = document.createElement('label');
+  lab.htmlFor = 'pic-' + f;
+  lab.innerHTML = `${FACE_NAMES[f]} face (${f}) center<span class="inrow"><span class="dot" style="width:16px;height:16px;border-radius:4px;flex:none;border:1px solid rgba(0,0,0,.3);background:var(--c${c})"></span></span>`;
+  const input = document.createElement('input');
+  input.id = 'pic-' + f;
+  input.placeholder = ['e.g. Seal', 'e.g. Franklin', 'e.g. Big 100', 'e.g. Bell', 'e.g. Signature', 'e.g. Back of bill'][c];
+  input.value = picNames[f] || '';
+  input.addEventListener('input', () => {
+    picNames[f] = input.value;
+    try { localStorage.setItem('moneyCubePicNames', JSON.stringify(picNames)); } catch (e) { /* fine without it */ }
+    renderChart();
+  });
+  lab.querySelector('.inrow').appendChild(input);
+  $('names').appendChild(lab);
+});
+
+function whereNow(pc) {
+  // find the spot whose colors match this piece's set of face pictures
+  const want = pc.faces.map(f => FACES.indexOf(f)).sort().join();
+  const spot = PIECES.find(q => q.kind === pc.kind && q.stickers.map(i => state[i]).sort().join() === want);
+  return spot || null;
+}
+function renderChart() {
+  const rows = [];
+  [3, 2, 1].forEach(kind => {
+    rows.push(`<tr class="kind"><td colspan="4">${KIND_NAMES[kind]}</td></tr>`);
+    PIECES.filter(pc => pc.kind === kind).forEach(pc => {
+      const pics = pc.faces.map(f => `<span class="pic"><b style="background:var(--c${FACES.indexOf(f)})"></b>${escapeHtml(picName(f))}</span>`).join('');
+      const now = kind === 1 ? pc : whereNow(pc);
+      const nowText = !now ? 'Not found yet' : now === pc ? 'Home' : spotName(now);
+      const pIndex = PIECES.indexOf(pc);
+      rows.push(`<tr data-p="${pIndex}" class="${selectedPiece === pIndex ? 'sel' : ''}"><td class="code">${pc.code}</td><td><span class="pics">${pics}</span></td><td class="where">${spotName(pc)}</td><td class="where ${now && now !== pc ? 'moved' : ''}">${nowText}</td></tr>`);
+    });
+  });
+  $('pieceRows').innerHTML = rows.join('');
+  highlightPiece();
+}
+function highlightPiece() {
+  stickerEls.forEach(el => el.classList.remove('hl'));
+  if (selectedPiece === null) return;
+  const pc = PIECES[selectedPiece];
+  const spot = pc.kind === 1 ? pc : whereNow(pc);
+  if (spot) spot.stickers.forEach(i => stickerEls[i].classList.add('hl'));
+}
+const escapeHtml = s => s.replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+$('pieceRows').addEventListener('click', e => {
+  const row = e.target.closest('tr[data-p]');
+  if (!row) return;
+  const p = +row.dataset.p;
+  selectedPiece = selectedPiece === p ? null : p;
+  renderChart();
+});
+$('btnCopyChart').onclick = () => {
+  const lines = [];
+  [3, 2, 1].forEach(kind => {
+    lines.push(KIND_NAMES[kind].toUpperCase());
+    PIECES.filter(pc => pc.kind === kind).forEach(pc => {
+      const now = kind === 1 ? pc : whereNow(pc);
+      lines.push(`${pc.code.padEnd(4)} ${pc.faces.map(picName).join(' + ').padEnd(48)} home: ${spotName(pc).padEnd(20)} now: ${!now ? '?' : now === pc ? 'home' : spotName(now)}`);
+    });
+    lines.push('');
+  });
+  const text = lines.join('\n');
+  const done = ok => { $('copyNote').textContent = ok ? 'Copied.' : 'Copy was blocked. Select the table and copy it by hand.'; };
+  try { navigator.clipboard.writeText(text).then(() => done(true), () => done(false)); } catch (e) { done(false); }
+};
+
 function render() {
-  paint3d(); paintNet(); renderCenters();
+  paint3d(); paintNet(); renderCenters(); renderChart();
   const m = moves[step];
   $('nowMove').textContent = m || (moves.length ? '✓' : '—');
   $('nowWhat').textContent = m ? describe(m) : (moves.length ? 'All turns done' : 'Press Solve to get your turns');
