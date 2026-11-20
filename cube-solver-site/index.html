@@ -146,6 +146,7 @@ table.pieces { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .where { white-space: nowrap; }
 .where.moved { color: var(--seal); font-weight: 600; }
 .stk.hl i { box-shadow: inset 0 0 0 4px #ffe14d, 0 0 10px 2px #ffe14d; }
+.maptab[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 ol.how { margin: 0; padding-left: 20px; display: grid; gap: 6px; color: var(--ink); }
 kbd { font-family: var(--font-mono); font-size: 12px; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
@@ -212,6 +213,31 @@ kbd { font-family: var(--font-mono); font-size: 12px; border: 1px solid var(--li
           <button id="btnCopyChart">Copy chart as text</button>
           <span class="note" id="copyNote"></span>
         </div>
+      </section>
+
+      <section class="panel" aria-label="Bill direction map">
+        <div class="panel-head">
+          <h2>Bill direction map</h2>
+          <span class="eyebrow">Money cube</span>
+        </div>
+        <p class="note">Center pictures spin freely, so they can't tell you which way a face points. Use this instead:</p>
+        <ol class="how">
+          <li>Build one bill by eye. Hold it with the Franklin half facing you, upright, and its seal half on the right.</li>
+          <li>Look only at the <b>kind</b> of the other centers (Franklin or seal), not which way they point. Pick the case below that matches where the other two Franklin centers are.</li>
+          <li>Every face now has a fixed direction. "Top of the bill" is where "100 FEDERAL RESERVE NOTE" or "THE UNITED STATES OF AMERICA" goes. The fold edge is where Franklin's face goes, or the "UN / O", eye and "ONE HU" column on a seal face.</li>
+        </ol>
+        <div class="controls" role="group" aria-label="Choose your case"><button class="maptab" data-case="A" aria-pressed="true">Case A: Franklin centers on left and back</button><button class="maptab" data-case="B" aria-pressed="false">Case B: Franklin centers on top and back</button><button class="maptab" data-case="C" aria-pressed="false">Case C: Franklin centers on top and bottom</button></div>
+        <div class="mapcase" data-case="A">
+          <p class="note">Use this map when the other two Franklin centers are on the LEFT and BACK.</p>
+          <div class="tablewrap"><table class="pieces"><thead><tr><th scope="col">Face</th><th scope="col">Kind</th><th scope="col">Top of the bill points to</th><th scope="col">Portrait / fold edge touches</th></tr></thead><tbody><tr><td class="code">Front</td><td><span class="pic"><b style="background:var(--c0)"></b>Franklin</span></td><td>top</td><td>right</td></tr><tr><td class="code">Right</td><td><span class="pic"><b style="background:var(--c2)"></b>seal</span></td><td>top</td><td>front</td></tr><tr><td class="code">Left</td><td><span class="pic"><b style="background:var(--c0)"></b>Franklin</span></td><td>back</td><td>top</td></tr><tr><td class="code">Top</td><td><span class="pic"><b style="background:var(--c2)"></b>seal</span></td><td>back</td><td>left</td></tr><tr><td class="code">Back</td><td><span class="pic"><b style="background:var(--c0)"></b>Franklin</span></td><td>left</td><td>bottom</td></tr><tr><td class="code">Bottom</td><td><span class="pic"><b style="background:var(--c2)"></b>seal</span></td><td>left</td><td>back</td></tr></tbody></table></div>
+        </div><div class="mapcase" data-case="B" hidden>
+          <p class="note">Use this map when the other two Franklin centers are on the TOP and BACK.</p>
+          <div class="tablewrap"><table class="pieces"><thead><tr><th scope="col">Face</th><th scope="col">Kind</th><th scope="col">Top of the bill points to</th><th scope="col">Portrait / fold edge touches</th></tr></thead><tbody><tr><td class="code">Front</td><td><span class="pic"><b style="background:var(--c0)"></b>Franklin</span></td><td>top</td><td>right</td></tr><tr><td class="code">Right</td><td><span class="pic"><b style="background:var(--c2)"></b>seal</span></td><td>top</td><td>front</td></tr><tr><td class="code">Top</td><td><span class="pic"><b style="background:var(--c0)"></b>Franklin</span></td><td>front</td><td>left</td></tr><tr><td class="code">Left</td><td><span class="pic"><b style="background:var(--c2)"></b>seal</span></td><td>front</td><td>top</td></tr><tr><td class="code">Back</td><td><span class="pic"><b style="background:var(--c0)"></b>Franklin</span></td><td>left</td><td>bottom</td></tr><tr><td class="code">Bottom</td><td><span class="pic"><b style="background:var(--c2)"></b>seal</span></td><td>left</td><td>back</td></tr></tbody></table></div>
+        </div><div class="mapcase" data-case="C" hidden>
+          <p class="note">Use this map when the other two Franklin centers are on the TOP and BOTTOM.</p>
+          <div class="tablewrap"><table class="pieces"><thead><tr><th scope="col">Face</th><th scope="col">Kind</th><th scope="col">Top of the bill points to</th><th scope="col">Portrait / fold edge touches</th></tr></thead><tbody><tr><td class="code">Front</td><td><span class="pic"><b style="background:var(--c0)"></b>Franklin</span></td><td>top</td><td>right</td></tr><tr><td class="code">Right</td><td><span class="pic"><b style="background:var(--c2)"></b>seal</span></td><td>top</td><td>front</td></tr><tr><td class="code">Top</td><td><span class="pic"><b style="background:var(--c0)"></b>Franklin</span></td><td>front</td><td>left</td></tr><tr><td class="code">Left</td><td><span class="pic"><b style="background:var(--c2)"></b>seal</span></td><td>front</td><td>top</td></tr><tr><td class="code">Bottom</td><td><span class="pic"><b style="background:var(--c0)"></b>Franklin</span></td><td>right</td><td>back</td></tr><tr><td class="code">Back</td><td><span class="pic"><b style="background:var(--c2)"></b>seal</span></td><td>right</td><td>bottom</td></tr></tbody></table></div>
+        </div>
+        <p class="note">Straighten the center pictures last, with the moves in step 3.</p>
       </section>
     </div>
 
@@ -988,6 +1014,12 @@ $('btnCopyChart').onclick = () => {
   const done = ok => { $('copyNote').textContent = ok ? 'Copied.' : 'Copy was blocked. Select the table and copy it by hand.'; };
   try { navigator.clipboard.writeText(text).then(() => done(true), () => done(false)); } catch (e) { done(false); }
 };
+
+// ----- bill direction map tabs -----
+document.querySelectorAll('.maptab').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.maptab').forEach(t => t.setAttribute('aria-pressed', t === b));
+  document.querySelectorAll('.mapcase').forEach(c => { c.hidden = c.dataset.case !== b.dataset.case; });
+}));
 
 function render() {
   paint3d(); paintNet(); renderCenters(); renderChart();
